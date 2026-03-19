@@ -12,6 +12,7 @@ const BASE_DIR = path.join(os.homedir(), ".dev-browser");
 const SOCKET_PATH = path.join(BASE_DIR, "daemon.sock");
 const PID_PATH = path.join(BASE_DIR, "daemon.pid");
 const BROWSERS_DIR = path.join(BASE_DIR, "browsers");
+const DEFAULT_SCRIPT_TIMEOUT_MS = 30_000;
 const EMBEDDED_PACKAGE_JSON = JSON.stringify({
   name: "dev-browser-runtime",
   private: true,
@@ -34,6 +35,9 @@ let shuttingDown: Promise<void> | null = null;
 
 function formatError(error: unknown): string {
   if (error instanceof Error) {
+    if (error.name === "ScriptTimeoutError") {
+      return error.message;
+    }
     return error.stack ?? error.message;
   }
 
@@ -94,9 +98,7 @@ function createMessageQueue(socket: net.Socket) {
 
   return {
     push(message: Response): Promise<void> {
-      queue = queue
-        .then(() => writeMessage(socket, message))
-        .catch(() => undefined);
+      queue = queue.then(() => writeMessage(socket, message)).catch(() => undefined);
       return queue;
     },
     async drain(): Promise<void> {
@@ -118,6 +120,7 @@ async function handleExecute(socket: net.Socket, request: ExecuteRequest): Promi
     }
 
     const output = createMessageQueue(socket);
+    const timeoutMs = request.timeoutMs ?? DEFAULT_SCRIPT_TIMEOUT_MS;
 
     try {
       await runScript(
@@ -140,6 +143,9 @@ async function handleExecute(socket: net.Socket, request: ExecuteRequest): Promi
             });
           },
         },
+        {
+          timeout: timeoutMs,
+        }
       );
 
       await output.drain();

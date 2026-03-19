@@ -79,7 +79,7 @@ describe.sequential("QuickJS sandbox integration", () => {
       output.sink,
       {
         timeout: 60_000,
-      },
+      }
     );
 
     expect(output.stdout.join("")).toContain("Example Domain");
@@ -100,7 +100,7 @@ describe.sequential("QuickJS sandbox integration", () => {
       output.sink,
       {
         timeout: 60_000,
-      },
+      }
     );
 
     expect(output.stdout.join("")).toContain("Example Domain");
@@ -120,7 +120,7 @@ describe.sequential("QuickJS sandbox integration", () => {
       output.sink,
       {
         timeout: 60_000,
-      },
+      }
     );
 
     expect(output.stdout.join("")).toContain("Example Domain");
@@ -136,8 +136,8 @@ describe.sequential("QuickJS sandbox integration", () => {
         `,
         manager,
         "default",
-        output.sink,
-      ),
+        output.sink
+      )
     ).rejects.toThrow("boom");
   });
 
@@ -154,9 +154,27 @@ describe.sequential("QuickJS sandbox integration", () => {
         output.sink,
         {
           timeout: 25,
-        },
-      ),
+        }
+      )
     ).rejects.toThrow(/timed out|interrupted/i);
+  }, 120_000);
+
+  it("enforces wall-clock timeouts for async scripts", async () => {
+    const output = createOutput();
+
+    await expect(
+      runScript(
+        `
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        `,
+        manager,
+        "default",
+        output.sink,
+        {
+          timeout: 25,
+        }
+      )
+    ).rejects.toThrow(/timed out|terminated/i);
   }, 120_000);
 
   it("routes console output to stdout", async () => {
@@ -168,7 +186,7 @@ describe.sequential("QuickJS sandbox integration", () => {
       `,
       manager,
       "default",
-      output.sink,
+      output.sink
     );
 
     expect(output.stdout.join("")).toContain("sandbox 42 { ok: true }");

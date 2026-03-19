@@ -10,6 +10,7 @@ export const ExecuteRequestSchema = RequestBaseSchema.extend({
   script: z.string(),
   headless: z.boolean().optional(),
   connect: z.string().min(1).optional(),
+  timeoutMs: z.number().int().positive().optional(),
 });
 
 export const BrowsersRequestSchema = RequestBaseSchema.extend({

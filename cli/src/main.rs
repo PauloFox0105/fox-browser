@@ -1,11 +1,13 @@
 mod connection;
 mod daemon;
+mod skill;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use connection::{connect_to_daemon, read_line, send_message};
 use daemon::{ensure_daemon, install_daemon_runtime, is_daemon_running};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use skill::install_skill;
 use std::error::Error;
 use std::fs;
 use std::io::{self, BufReader, Read, Write};
@@ -89,10 +91,13 @@ Page objects — you get the same API (goto, click, fill, locator, evaluate, etc
   https://playwright.dev/docs/api/class-page"###;
 
 const CLI_AFTER_LONG_HELP: &str = r####"LLM USAGE GUIDE:
-  Prefer SHORT, focused scripts for exploring pages — one action at a time.
-  Use LONGER scripts only when automating repetitive or multi-step workflows.
+  Write small, focused scripts. Each script should do ONE thing: navigate, click, fill, or check.
+  End each script by logging the state you need for the next decision.
+  Use descriptive page names like "login", "checkout", or "results" instead of "page1".
+  Named pages from browser.getPage("name") persist between script runs, so you usually do not need to re-navigate.
+  Inside page.evaluate(...), write plain JavaScript only - no TypeScript syntax in the browser context.
 
-  Short exploration scripts (preferred):
+  Quick inspection:
     dev-browser --connect <<'EOF'
     const tabs = await browser.listPages();
     console.log(JSON.stringify(tabs, null, 2));
@@ -100,50 +105,81 @@ const CLI_AFTER_LONG_HELP: &str = r####"LLM USAGE GUIDE:
 
     dev-browser --connect <<'EOF'
     const page = await browser.getPage("TARGET_ID_HERE");
-    console.log(await page.title());
-    console.log(await page.textContent("body"));
+    console.log(JSON.stringify({
+      url: page.url(),
+      title: await page.title(),
+    }, null, 2));
     EOF
 
-  Longer automation scripts (when needed):
-  When using dev-browser to automate a browser, prefer piping a script via heredoc:
+  AI snapshots for element discovery:
+    dev-browser <<'EOF'
+    const page = await browser.getPage("main");
+    const result = await page.snapshotForAI();
+    console.log(result.full);
+    // Returns { full: string, incremental?: string }.
+    // Optional args: { track?: string, depth?: number, timeout?: number }.
+    // Read result.full to identify the right element.
+    // Then interact with it using Playwright:
+    // await page.getByRole("button", { name: "Continue" }).click();
+    // Re-run page.snapshotForAI({ track: "main" }) after the page changes.
+    EOF
 
-  dev-browser <<'EOF'
-  const page = await browser.getPage("main");
-  await page.goto("https://example.com");
+  Choosing your approach:
+    Unknown pages: use page.snapshotForAI() first to discover the page, then interact based on what you find.
+    Known pages/selectors: skip the snapshot and use direct Playwright selectors like page.click(), page.fill(), or page.locator() for faster, more reliable automation.
 
-  // Get page content
-  const title = await page.title();
-  const text = await page.textContent("body");
-  console.log(JSON.stringify({ title, text }));
+  Screenshots for visual state:
+    dev-browser <<'EOF'
+    const page = await browser.getPage("main");
+    const buf = await page.screenshot();
+    const path = await saveScreenshot(buf, "debug.png");
+    console.log(path);
+    EOF
 
-  // Interact with elements
-  await page.fill("#search", "query");
-  await page.click("button[type=submit]");
+  Waiting patterns:
+    dev-browser <<'EOF'
+    const page = await browser.getPage("search-results");
+    await page.waitForSelector(".results");
+    await page.waitForURL("**/success");
+    console.log(JSON.stringify({
+      url: page.url(),
+      title: await page.title(),
+    }, null, 2));
+    EOF
 
-  // Wait for navigation or results
-  await page.waitForSelector(".results");
-  const results = await page.$$eval(".result", (els) =>
-    els.map((e) => e.textContent)
-  );
-  console.log(JSON.stringify(results));
-  EOF
+  Error recovery:
+    If a script fails, the page usually stays where it stopped.
+    Reconnect to the same page name, take a screenshot, and log the URL/title:
+    dev-browser <<'EOF'
+    const page = await browser.getPage("checkout");
+    const path = await saveScreenshot(await page.screenshot(), "debug.png");
+    console.log(JSON.stringify({
+      screenshot: path,
+      url: page.url(),
+      title: await page.title(),
+    }, null, 2));
+    EOF
 
   Common Playwright Page methods:
-    page.goto(url)                 Navigate to a URL
-    page.title()                   Get the current page title
-    page.textContent(selector)     Get the text content of an element
-    page.innerHTML(selector)       Get the inner HTML of an element
-    page.fill(selector, value)     Fill an input field
-    page.click(selector)           Click an element
-    page.type(selector, text)      Type text character by character
-    page.press(selector, key)      Press a key such as Enter or Tab
-    page.waitForSelector(selector) Wait for an element to appear
-    page.waitForURL(url)           Wait for navigation to a URL
-    page.screenshot({ path })      Save a screenshot under ~/.dev-browser/tmp/
-    page.$$eval(selector, fn)      Run a function on all matching elements
-    page.$eval(selector, fn)       Run a function on the first matching element
-    page.evaluate(fn)              Run JavaScript in the page context
-    page.locator(selector)         Create a locator for chained actions
+    page.goto(url)                         Navigate to a URL
+    page.title()                           Get the current page title
+    page.url()                             Get the current URL
+    page.snapshotForAI(options)            Get an AI-optimized snapshot; returns { full, incremental? }
+                                           Options: { track?: string, depth?: number, timeout?: number }
+    page.getByRole(role, { name })         Target elements discovered from the snapshot
+    page.textContent(selector)             Get the text content of an element
+    page.innerHTML(selector)               Get the inner HTML of an element
+    page.fill(selector, value)             Fill an input field
+    page.click(selector)                   Click an element
+    page.type(selector, text)              Type text character by character
+    page.press(selector, key)              Press a key such as Enter or Tab
+    page.waitForSelector(selector)         Wait for an element to appear
+    page.waitForURL(url)                   Wait for navigation to a URL
+    page.screenshot()                      Capture a screenshot buffer; save it with saveScreenshot(...)
+    page.$$eval(selector, fn)              Run a function on all matching elements
+    page.$eval(selector, fn)               Run a function on the first matching element
+    page.evaluate(fn)                      Run JavaScript in the page context (plain JS only)
+    page.locator(selector)                 Create a locator for chained actions
 
   Connecting to a running Chrome instance:
     Auto-discover Chrome with debugging enabled:
@@ -165,10 +201,14 @@ const CLI_AFTER_LONG_HELP: &str = r####"LLM USAGE GUIDE:
 
   Tips:
     - Use console.log(JSON.stringify(...)) for structured output.
-    - Named pages from browser.getPage("name") persist between script runs.
+    - Prefer page.snapshotForAI() for structure; use screenshots when visual layout or styling matters.
+    - Keep page names stable across scripts so you can resume work after failures.
     - Each --browser name maps to a separate daemon-managed browser instance.
     - Use --connect to attach to an existing browser; omit the URL to auto-discover Chrome with debugging enabled.
+    - Use short timeouts (--timeout 10) so scripts fail fast instead of hanging on missing elements.
     - Add --headless for unattended automation; omit it when you want to watch the browser window."####;
+
+const DEFAULT_SCRIPT_TIMEOUT_SECS: u32 = 30;
 
 #[derive(Parser)]
 #[command(name = "dev-browser")]
@@ -202,6 +242,16 @@ struct Cli {
     )]
     headless: bool,
 
+    #[arg(
+        long,
+        default_value_t = DEFAULT_SCRIPT_TIMEOUT_SECS,
+        value_name = "SECONDS",
+        value_parser = clap::value_parser!(u32).range(1..),
+        help = "Maximum script execution time in seconds",
+        long_help = "Maximum script execution time in seconds.\n\nIf the script exceeds this limit, the daemon terminates it and returns an error.\n\nDefaults to 30 seconds."
+    )]
+    timeout: u32,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -225,6 +275,11 @@ enum Command {
         long_about = "Install Playwright browsers (Chromium).\n\nDownloads the Chromium build used for daemon-managed browser instances."
     )]
     Install,
+    #[command(
+        about = "Install the dev-browser skill into agent skill directories",
+        long_about = "Install the embedded dev-browser skill into selected agent skill directories.\n\nLaunches an interactive multi-select prompt for the supported install targets."
+    )]
+    InstallSkill,
     #[command(
         about = "List all managed browser instances",
         long_about = "List all managed browser instances.\n\nShows the browser name, whether it is daemon-launched or externally connected, its status, and any named pages currently registered."
@@ -304,6 +359,10 @@ fn run() -> Result<i32, Box<dyn Error>> {
             install_daemon_runtime()?;
             Ok(0)
         }
+        Some(Command::InstallSkill) => {
+            install_skill()?;
+            Ok(0)
+        }
         Some(Command::Status) => {
             ensure_daemon()?;
             send_request(
@@ -351,11 +410,16 @@ fn run() -> Result<i32, Box<dyn Error>> {
 fn run_script(cli: &Cli, script: String) -> Result<i32, Box<dyn Error>> {
     ensure_daemon()?;
 
+    let timeout_ms = u64::from(cli.timeout)
+        .checked_mul(1_000)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Timeout value is too large"))?;
+
     let mut request = json!({
         "id": request_id("execute"),
         "type": "execute",
         "browser": cli.browser,
         "script": script,
+        "timeoutMs": timeout_ms,
     });
 
     if cli.headless {
