@@ -1,11 +1,13 @@
 mod connection;
 mod daemon;
+mod skill;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use connection::{connect_to_daemon, read_line, send_message};
 use daemon::{ensure_daemon, install_daemon_runtime, is_daemon_running};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use skill::install_skill;
 use std::error::Error;
 use std::fs;
 use std::io::{self, BufReader, Read, Write};
@@ -226,6 +228,11 @@ enum Command {
     )]
     Install,
     #[command(
+        about = "Install the dev-browser skill into agent skill directories",
+        long_about = "Install the embedded dev-browser skill into selected agent skill directories.\n\nLaunches an interactive multi-select prompt for the supported install targets."
+    )]
+    InstallSkill,
+    #[command(
         about = "List all managed browser instances",
         long_about = "List all managed browser instances.\n\nShows the browser name, whether it is daemon-launched or externally connected, its status, and any named pages currently registered."
     )]
@@ -302,6 +309,10 @@ fn run() -> Result<i32, Box<dyn Error>> {
         }
         Some(Command::Install) => {
             install_daemon_runtime()?;
+            Ok(0)
+        }
+        Some(Command::InstallSkill) => {
+            install_skill()?;
             Ok(0)
         }
         Some(Command::Status) => {
