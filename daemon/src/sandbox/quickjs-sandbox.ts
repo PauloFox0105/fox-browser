@@ -68,27 +68,52 @@ function getSandboxClientBundleCode(): Promise<string> {
   return bundleCodePromise;
 }
 
-function withWallClockTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
-  if (timeoutMs === undefined) {
-    return promise;
+function formatTimeoutDuration(timeoutMs: number): string {
+  if (timeoutMs % 1_000 === 0) {
+    return `${timeoutMs / 1_000}s`;
   }
 
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(() => {
-      reject(new Error(`Script timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+  return `${timeoutMs}ms`;
+}
 
-    promise.then(
-      (value) => {
-        globalThis.clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        globalThis.clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
+function createScriptTimeoutError(timeoutMs: number): Error {
+  const error = new Error(
+    `Script timed out after ${formatTimeoutDuration(timeoutMs)} and was terminated.`
+  );
+  error.name = "ScriptTimeoutError";
+  return error;
+}
+
+function createGuestScriptTimeoutErrorSource(timeoutMs: number): string {
+  const message = JSON.stringify(createScriptTimeoutError(timeoutMs).message);
+  return `(() => {
+    const error = new Error(${message});
+    error.name = "ScriptTimeoutError";
+    return error;
+  })()`;
+}
+
+function wrapScriptWithWallClockTimeout(script: string, timeoutMs?: number): string {
+  if (timeoutMs === undefined) {
+    return script;
+  }
+
+  return `
+    (() => {
+      return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(${createGuestScriptTimeoutErrorSource(timeoutMs)});
+        }, ${timeoutMs});
+
+        Promise.resolve()
+          .then(() => (${script}))
+          .then(resolve, reject)
+          .finally(() => {
+            clearTimeout(timeoutId);
+          });
+      });
+    })()
+  `;
 }
 
 function requireString(value: unknown, label: string): string {
@@ -519,11 +544,11 @@ export class QuickJSSandbox {
     try {
       this.#throwIfAsyncError();
 
-      await withWallClockTimeout(
-        this.#host!.executeScript(script, {
+      await this.#host!.executeScript(
+        wrapScriptWithWallClockTimeout(script, this.#options.timeoutMs),
+        {
           filename: "user-script.js",
-        }),
-        this.#options.timeoutMs
+        }
       );
 
       await this.#flushTransportQueue();

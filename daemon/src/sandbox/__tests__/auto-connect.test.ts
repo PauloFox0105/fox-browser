@@ -668,4 +668,27 @@ describe("protocol execute request", () => {
       },
     });
   });
+
+  it("accepts an execution timeout", () => {
+    const result = parseRequest(
+      JSON.stringify({
+        id: "req-timeout",
+        type: "execute",
+        browser: "default",
+        script: 'console.log("hi")',
+        timeoutMs: 10_000,
+      })
+    );
+
+    expect(result).toEqual({
+      success: true,
+      request: {
+        id: "req-timeout",
+        type: "execute",
+        browser: "default",
+        script: 'console.log("hi")',
+        timeoutMs: 10_000,
+      },
+    });
+  });
 });

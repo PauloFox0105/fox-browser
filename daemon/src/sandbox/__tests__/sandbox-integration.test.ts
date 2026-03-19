@@ -159,6 +159,24 @@ describe.sequential("QuickJS sandbox integration", () => {
     ).rejects.toThrow(/timed out|interrupted/i);
   }, 120_000);
 
+  it("enforces wall-clock timeouts for async scripts", async () => {
+    const output = createOutput();
+
+    await expect(
+      runScript(
+        `
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        `,
+        manager,
+        "default",
+        output.sink,
+        {
+          timeout: 25,
+        }
+      )
+    ).rejects.toThrow(/timed out|terminated/i);
+  }, 120_000);
+
   it("routes console output to stdout", async () => {
     const output = createOutput();
 

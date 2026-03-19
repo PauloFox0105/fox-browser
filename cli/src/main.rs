@@ -173,7 +173,10 @@ const CLI_AFTER_LONG_HELP: &str = r####"LLM USAGE GUIDE:
     - Named pages from browser.getPage("name") persist between script runs.
     - Each --browser name maps to a separate daemon-managed browser instance.
     - Use --connect to attach to an existing browser; omit the URL to auto-discover Chrome with debugging enabled.
+    - Use short timeouts (--timeout 10) so scripts fail fast instead of hanging on missing elements.
     - Add --headless for unattended automation; omit it when you want to watch the browser window."####;
+
+const DEFAULT_SCRIPT_TIMEOUT_SECS: u32 = 30;
 
 #[derive(Parser)]
 #[command(name = "dev-browser")]
@@ -206,6 +209,16 @@ struct Cli {
         long_help = "Launch or relaunch daemon-managed Chromium in headless mode.\n\nThis only affects daemon-launched browsers. It has no effect when `--connect` attaches to an already-running external browser."
     )]
     headless: bool,
+
+    #[arg(
+        long,
+        default_value_t = DEFAULT_SCRIPT_TIMEOUT_SECS,
+        value_name = "SECONDS",
+        value_parser = clap::value_parser!(u32).range(1..),
+        help = "Maximum script execution time in seconds",
+        long_help = "Maximum script execution time in seconds.\n\nIf the script exceeds this limit, the daemon terminates it and returns an error.\n\nDefaults to 30 seconds."
+    )]
+    timeout: u32,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -365,11 +378,16 @@ fn run() -> Result<i32, Box<dyn Error>> {
 fn run_script(cli: &Cli, script: String) -> Result<i32, Box<dyn Error>> {
     ensure_daemon()?;
 
+    let timeout_ms = u64::from(cli.timeout)
+        .checked_mul(1_000)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Timeout value is too large"))?;
+
     let mut request = json!({
         "id": request_id("execute"),
         "type": "execute",
         "browser": cli.browser,
         "script": script,
+        "timeoutMs": timeout_ms,
     });
 
     if cli.headless {
