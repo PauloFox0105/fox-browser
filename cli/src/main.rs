@@ -133,6 +133,8 @@ const CLI_AFTER_LONG_HELP: &str = r####"LLM USAGE GUIDE:
   Common Playwright Page methods:
     page.goto(url)                 Navigate to a URL
     page.title()                   Get the current page title
+    page._snapshotForAI()          Get an LLM-friendly text snapshot of the page
+                                   from the accessibility tree without using screenshots
     page.textContent(selector)     Get the text content of an element
     page.innerHTML(selector)       Get the inner HTML of an element
     page.fill(selector, value)     Fill an input field
@@ -167,6 +169,7 @@ const CLI_AFTER_LONG_HELP: &str = r####"LLM USAGE GUIDE:
 
   Tips:
     - Use console.log(JSON.stringify(...)) for structured output.
+    - Prefer page._snapshotForAI() to understand page content without relying on screenshots.
     - Named pages from browser.getPage("name") persist between script runs.
     - Each --browser name maps to a separate daemon-managed browser instance.
     - Use --connect to attach to an existing browser; omit the URL to auto-discover Chrome with debugging enabled.
