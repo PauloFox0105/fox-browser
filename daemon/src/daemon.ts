@@ -13,6 +13,7 @@ const SOCKET_PATH = path.join(BASE_DIR, "daemon.sock");
 const PID_PATH = path.join(BASE_DIR, "daemon.pid");
 const BROWSERS_DIR = path.join(BASE_DIR, "browsers");
 const DEFAULT_SCRIPT_TIMEOUT_MS = 30_000;
+const SOCKET_CLOSE_TIMEOUT_MS = 500;
 const EMBEDDED_PACKAGE_JSON = JSON.stringify({
   name: "dev-browser-runtime",
   private: true,
@@ -70,6 +71,38 @@ async function unlinkIfExists(filePath: string): Promise<void> {
       throw error;
     }
   }
+}
+
+async function closeServerInstance(serverToClose: net.Server): Promise<void> {
+  await new Promise<void>((resolve) => {
+    serverToClose.close(() => {
+      resolve();
+    });
+  });
+}
+
+async function closeClientSocket(socket: net.Socket): Promise<void> {
+  if (socket.destroyed) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const timeout = setTimeout(() => {
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
+    }, SOCKET_CLOSE_TIMEOUT_MS);
+    timeout.unref();
+
+    const finish = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+
+    socket.once("close", finish);
+    socket.once("error", finish);
+    socket.end();
+  });
 }
 
 async function withBrowserLock<T>(browserName: string, action: () => Promise<T>): Promise<T> {
@@ -262,6 +295,15 @@ async function handleRequest(socket: net.Socket, line: string): Promise<void> {
 
   const { request } = parsed;
 
+  if (shuttingDown && request.type !== "stop") {
+    await writeMessage(socket, {
+      id: request.id,
+      type: "error",
+      message: "Daemon is shutting down",
+    });
+    return;
+  }
+
   switch (request.type) {
     case "execute":
       await handleExecute(socket, request);
@@ -328,9 +370,7 @@ async function handleRequest(socket: net.Socket, line: string): Promise<void> {
         type: "complete",
         success: true,
       });
-      setImmediate(() => {
-        void shutdown(0);
-      });
+      void shutdown(0);
       return;
   }
 }
@@ -341,19 +381,15 @@ async function shutdown(exitCode = 0): Promise<void> {
   }
 
   shuttingDown = (async () => {
-    if (server) {
-      server.close();
-      server = null;
-    }
+    const serverToClose = server;
+    server = null;
+    const serverClosed = serverToClose ? closeServerInstance(serverToClose) : Promise.resolve();
 
     await manager.stopAll();
+    await Promise.allSettled(Array.from(clients, (socket) => closeClientSocket(socket)));
+    await serverClosed;
     await Promise.allSettled([unlinkIfExists(PID_PATH), unlinkIfExists(SOCKET_PATH)]);
 
-    for (const socket of clients) {
-      if (!socket.destroyed) {
-        socket.destroy();
-      }
-    }
     clients.clear();
 
     process.exit(exitCode);
@@ -369,6 +405,11 @@ async function start(): Promise<void> {
   await writeFile(PID_PATH, `${process.pid}\n`);
 
   server = net.createServer((socket) => {
+    if (shuttingDown) {
+      socket.end();
+      return;
+    }
+
     clients.add(socket);
     socket.setEncoding("utf8");
 

@@ -13,7 +13,16 @@ use std::time::{Duration, Instant};
 const DEV_BROWSER_DIR: &str = ".dev-browser";
 const EMBEDDED_DAEMON: &str = include_str!("../../daemon/dist/daemon.bundle.mjs");
 const EMBEDDED_SANDBOX_CLIENT: &str = include_str!("../../daemon/dist/sandbox-client.js");
-const EMBEDDED_PACKAGE_JSON: &str = r#"{"name":"dev-browser-runtime","private":true,"type":"module","packageManager":"pnpm@10.30.1","dependencies":{"playwright":"^1.52.0","playwright-core":"^1.52.0","quickjs-emscripten":"^0.32.0"}}"#;
+const EMBEDDED_PACKAGE_JSON: &str = r#"{
+  "name": "dev-browser-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.52.0",
+    "playwright-core": "^1.52.0",
+    "quickjs-emscripten": "^0.32.0"
+  }
+}"#;
 
 struct DaemonCommand {
     program: String,
@@ -28,7 +37,7 @@ pub fn ensure_daemon() -> Result<(), Box<dyn Error>> {
     }
 
     let command = find_daemon_command()?;
-    if command.requires_runtime_install && !embedded_playwright_installed(&command.current_dir) {
+    if command.requires_runtime_install && !embedded_runtime_installed(&command.current_dir) {
         return Err(
             "Embedded daemon dependencies are missing. Run `dev-browser install` first.".into(),
         );
@@ -64,10 +73,10 @@ pub fn ensure_daemon_extracted() -> Result<PathBuf, Box<dyn Error>> {
 pub fn install_daemon_runtime() -> Result<(), Box<dyn Error>> {
     let base_dir = daemon_base_dir()?;
     ensure_daemon_extracted()?;
-    run_install_command("pnpm", &["install"], &base_dir)?;
+    run_install_command(npm_command(), &["install"], &base_dir)?;
     run_install_command(
-        "pnpm",
-        &["exec", "playwright", "install", "chromium"],
+        npm_command(),
+        &["exec", "--", "playwright", "install", "chromium"],
         &base_dir,
     )?;
     Ok(())
@@ -79,6 +88,23 @@ pub fn is_daemon_running() -> bool {
     };
 
     process_is_alive(pid) && connect_to_daemon().is_ok()
+}
+
+pub fn current_daemon_pid() -> Option<i32> {
+    daemon_pid()
+}
+
+pub fn wait_for_daemon_exit(pid: i32, timeout: Duration) -> Result<(), Box<dyn Error>> {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if !process_is_alive(pid) {
+            return Ok(());
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    Err(format!("Daemon failed to stop within {} seconds", timeout.as_secs()).into())
 }
 
 fn spawn_daemon(command: &DaemonCommand) -> io::Result<()> {
@@ -189,12 +215,25 @@ fn daemon_base_dir() -> Result<PathBuf, Box<dyn Error>> {
         })
 }
 
-fn embedded_playwright_installed(base_dir: &Path) -> bool {
+fn embedded_runtime_installed(base_dir: &Path) -> bool {
+    dependency_installed(base_dir, "playwright")
+        && dependency_installed(base_dir, "quickjs-emscripten")
+}
+
+fn dependency_installed(base_dir: &Path, package_name: &str) -> bool {
     base_dir
         .join("node_modules")
-        .join("playwright")
+        .join(package_name)
         .join("package.json")
         .is_file()
+}
+
+fn npm_command() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "npm.cmd"
+    } else {
+        "npm"
+    }
 }
 
 fn sync_text_file(path: &Path, contents: &str) -> Result<(), Box<dyn Error>> {
@@ -222,7 +261,22 @@ fn run_install_command(
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .status()?;
+        .status()
+        .map_err(|error| -> Box<dyn Error> {
+            match error.kind() {
+                io::ErrorKind::NotFound => format!(
+                    "Could not find `{program}` in PATH while setting up the embedded daemon runtime in {}. Install Node.js/npm and run `dev-browser install` again.",
+                    current_dir.display()
+                )
+                .into(),
+                _ => format!(
+                    "Failed to run `{program} {}` in {}: {error}",
+                    args.join(" "),
+                    current_dir.display()
+                )
+                .into(),
+            }
+        })?;
 
     if status.success() {
         return Ok(());

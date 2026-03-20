@@ -304,10 +304,11 @@ export class BrowserManager {
     }
 
     this.browsers.delete(name);
+    entry.pages.clear();
 
     try {
       if (entry.type === "launched") {
-        await entry.context.close();
+        await this.closeLaunchedBrowser(entry);
       } else {
         await entry.browser.close();
       }
@@ -318,9 +319,7 @@ export class BrowserManager {
 
   async stopAll(): Promise<void> {
     const names = Array.from(this.browsers.keys());
-    for (const name of names) {
-      await this.stopBrowser(name);
-    }
+    await Promise.allSettled(names.map(async (name) => this.stopBrowser(name)));
   }
 
   browserCount(): number {
@@ -412,6 +411,15 @@ export class BrowserManager {
         this.browsers.delete(entry.name);
       }
     });
+  }
+
+  private async closeLaunchedBrowser(entry: BrowserEntry): Promise<void> {
+    const contexts = this.getBrowserContexts(entry);
+    await Promise.allSettled(contexts.map(async (context) => context.close()));
+
+    if (entry.browser.isConnected()) {
+      await entry.browser.close().catch(() => undefined);
+    }
   }
 
   private async discoverChrome(): Promise<string | null> {

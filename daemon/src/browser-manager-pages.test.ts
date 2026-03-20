@@ -123,4 +123,20 @@ describe.sequential("BrowserManager page discovery", () => {
       (await manager.listPages(browserName)).filter((page) => page.name === "persist")
     ).toHaveLength(1);
   }, 120_000);
+
+  it("stopBrowser closes launched browser pages before removing the browser", async () => {
+    await ensureBrowser();
+
+    const namedPage = await manager.getPage(browserName, "cleanup");
+    const anonymousPage = await manager.newPage(browserName);
+
+    await namedPage.goto(createDataUrl("Cleanup Named", "<div>named</div>"));
+    await anonymousPage.goto(createDataUrl("Cleanup Anonymous", "<div>anon</div>"));
+
+    await manager.stopBrowser(browserName);
+
+    expect(namedPage.isClosed()).toBe(true);
+    expect(anonymousPage.isClosed()).toBe(true);
+    expect(manager.listBrowsers()).toEqual([]);
+  }, 120_000);
 });
