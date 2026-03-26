@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 
-interface BrowserEntry {
+export interface BrowserEntry {
   name: string;
   type: "launched" | "connected";
   browser: Browser;

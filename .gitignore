@@ -1,8 +1,6 @@
 
 _scratch/
 !bin/dev-browser.js
-!daemon/dist/daemon.bundle.mjs
-!daemon/dist/sandbox-client.js
 .dev-browser/
 .DS_Store
 .env
