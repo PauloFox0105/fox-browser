@@ -57,7 +57,9 @@ Windows npm installs download the native `dev-browser-windows-x64.exe` release a
 
 ### Using with AI agents
 
-After installing, just tell your agent to run `dev-browser --help` — the help output includes a full LLM usage guide with examples and API reference. No plugin or skill installation needed.
+After installing, you can tell an agent to run `dev-browser --help` — the help output includes a full LLM usage guide with examples and API reference.
+
+Codex users can also install the repo-local plugin shipped in this repository. The plugin lives at `plugins/dev-browser`, and `.agents/plugins/marketplace.json` exposes it as a local marketplace entry for Codex.
 
 <details>
 <summary>Allowing dev-browser in Claude Code without permission prompts</summary>
@@ -69,9 +71,7 @@ By default, Claude Code asks for approval each time it runs a bash command. You 
 ```json
 {
   "permissions": {
-    "allow": [
-      "Bash(dev-browser *)"
-    ]
+    "allow": ["Bash(dev-browser *)"]
   }
 }
 ```
@@ -81,9 +81,7 @@ By default, Claude Code asks for approval each time it runs a bash command. You 
 ```json
 {
   "permissions": {
-    "allow": [
-      "Bash(dev-browser *)"
-    ]
+    "allow": ["Bash(dev-browser *)"]
   }
 }
 ```
@@ -95,10 +93,7 @@ You can also allow related commands in the same list:
 ```json
 {
   "permissions": {
-    "allow": [
-      "Bash(dev-browser *)",
-      "Bash(npx dev-browser *)"
-    ]
+    "allow": ["Bash(dev-browser *)", "Bash(npx dev-browser *)"]
   }
 }
 ```
@@ -108,7 +103,19 @@ You can also allow related commands in the same list:
 </details>
 
 <details>
-<summary>Legacy plugin installation (Claude Code / Amp / Codex)</summary>
+<summary>Codex plugin installation (repo-local)</summary>
+
+1. Open this repo in Codex.
+2. Verify that the repo marketplace file exists at `.agents/plugins/marketplace.json`.
+3. Restart Codex and open `/plugins`.
+4. Install or enable `dev-browser` from the `Dev Browser Local` marketplace.
+
+The plugin packages the bundled skill from `plugins/dev-browser/skills/dev-browser/SKILL.md`.
+
+</details>
+
+<details>
+<summary>Legacy plugin installation (Claude Code / Amp / skill copy)</summary>
 
 ### Claude Code
 
@@ -119,7 +126,7 @@ You can also allow related commands in the same list:
 
 Restart Claude Code after installation.
 
-### Amp / Codex
+### Amp / Codex skill copy
 
 Copy the skill to your skills directory:
 
@@ -139,7 +146,7 @@ rm -rf /tmp/dev-browser-skill
 
 Scripts run in a sandboxed QuickJS runtime (not Node.js). Available globals:
 
-```javascript
+```text
 // Browser control
 browser.getPage(nameOrId)    // Get/create named page, or connect to tab by targetId
 browser.newPage()            // Create anonymous page (cleaned up after script)

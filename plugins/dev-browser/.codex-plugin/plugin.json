@@ -1,0 +1,30 @@
+{
+  "name": "dev-browser",
+  "version": "0.2.3",
+  "description": "Reusable Codex skill for browser automation with the dev-browser CLI.",
+  "author": {
+    "name": "Sawyer Hood",
+    "email": "sawyerjhood@gmail.com",
+    "url": "https://github.com/sawyerhood"
+  },
+  "homepage": "https://github.com/SawyerHood/dev-browser",
+  "repository": "https://github.com/SawyerHood/dev-browser",
+  "license": "MIT",
+  "keywords": ["browser", "automation", "playwright", "testing", "quickjs", "codex"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dev Browser",
+    "shortDescription": "Browser automation with sandboxed scripts and persistent pages.",
+    "longDescription": "Adds a reusable Codex skill for navigating sites, capturing snapshots and screenshots, extracting content, and testing web flows with the local dev-browser CLI.",
+    "developerName": "Sawyer Hood",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/SawyerHood/dev-browser",
+    "defaultPrompt": [
+      "Use dev-browser to inspect the current page structure and identify the next element to click.",
+      "Use dev-browser to automate this browser flow, keeping each script small and logging structured state after each step.",
+      "Use dev-browser to capture an AI snapshot or screenshot and summarize what changed."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

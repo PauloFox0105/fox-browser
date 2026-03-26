@@ -8,8 +8,9 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
+    "sync-skills": "node scripts/sync-skills.js",
     "version:sync": "node scripts/sync-version.js",
-    "version": "npm run version:sync && git add cli/Cargo.toml cli/Cargo.lock .claude-plugin/marketplace.json"
+    "version": "npm run version:sync && git add cli/Cargo.toml cli/Cargo.lock .claude-plugin/marketplace.json plugins/dev-browser/.codex-plugin/plugin.json"
   },
   "files": [
     "bin/",

@@ -1,24 +1,31 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { execSync } from "child_process";
+import { readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = join(__dirname, '..');
-const cliDir = join(projectRoot, 'cli');
-const marketplaceJsonPath = join(projectRoot, '.claude-plugin', 'marketplace.json');
-const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'));
+const projectRoot = join(__dirname, "..");
+const cliDir = join(projectRoot, "cli");
+const marketplaceJsonPath = join(projectRoot, ".claude-plugin", "marketplace.json");
+const codexPluginManifestPath = join(
+  projectRoot,
+  "plugins",
+  "dev-browser",
+  ".codex-plugin",
+  "plugin.json"
+);
+const packageJson = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8"));
 const version = packageJson.version;
-const cargoTomlPath = join(cliDir, 'Cargo.toml');
+const cargoTomlPath = join(cliDir, "Cargo.toml");
 
-let cargoToml = readFileSync(cargoTomlPath, 'utf8');
+let cargoToml = readFileSync(cargoTomlPath, "utf8");
 const versionLine = `version = "${version}"`;
 const versionPattern = /^version\s*=\s*"[^"]*"$/m;
 
 if (!versionPattern.test(cargoToml)) {
-  console.error('Could not find the version field in cli/Cargo.toml.');
+  console.error("Could not find the version field in cli/Cargo.toml.");
   process.exit(1);
 }
 
@@ -28,18 +35,18 @@ if (!cargoToml.includes(versionLine)) {
   console.log(`Updated cli/Cargo.toml to version ${version}.`);
 
   try {
-    execSync('cargo update -p dev-browser --offline', {
+    execSync("cargo update -p dev-browser --offline", {
       cwd: cliDir,
-      stdio: 'pipe',
+      stdio: "pipe",
     });
-    console.log('Updated cli/Cargo.lock.');
+    console.log("Updated cli/Cargo.lock.");
   } catch {
     try {
-      execSync('cargo update -p dev-browser', {
+      execSync("cargo update -p dev-browser", {
         cwd: cliDir,
-        stdio: 'pipe',
+        stdio: "pipe",
       });
-      console.log('Updated cli/Cargo.lock.');
+      console.log("Updated cli/Cargo.lock.");
     } catch (error) {
       console.warn(`Warning: Could not update cli/Cargo.lock: ${error.message}`);
     }
@@ -48,7 +55,7 @@ if (!cargoToml.includes(versionLine)) {
   console.log(`cli/Cargo.toml already matches package.json version ${version}.`);
 }
 
-const marketplaceJson = JSON.parse(readFileSync(marketplaceJsonPath, 'utf8'));
+const marketplaceJson = JSON.parse(readFileSync(marketplaceJsonPath, "utf8"));
 
 if (!marketplaceJson.metadata) {
   marketplaceJson.metadata = {};
@@ -60,4 +67,16 @@ if (marketplaceJson.metadata.version !== version) {
   console.log(`Updated .claude-plugin/marketplace.json to version ${version}.`);
 } else {
   console.log(`.claude-plugin/marketplace.json already matches package.json version ${version}.`);
+}
+
+const codexPluginManifest = JSON.parse(readFileSync(codexPluginManifestPath, "utf8"));
+
+if (codexPluginManifest.version !== version) {
+  codexPluginManifest.version = version;
+  writeFileSync(codexPluginManifestPath, `${JSON.stringify(codexPluginManifest, null, 2)}\n`);
+  console.log(`Updated plugins/dev-browser/.codex-plugin/plugin.json to version ${version}.`);
+} else {
+  console.log(
+    `plugins/dev-browser/.codex-plugin/plugin.json already matches package.json version ${version}.`
+  );
 }

@@ -20,6 +20,14 @@ For bug reports, include steps to reproduce. For feature requests, explain the u
 4. Make your changes, ensuring tests pass (`npm test`) and types check (`npx tsc --noEmit`)
 5. Submit a PR referencing the related issue
 
+## Skill Sync
+
+Edit the canonical dev-browser skill at `skills/dev-browser/SKILL.md`.
+
+When you change that file, run `npm run sync-skills` to copy it to plugin locations such as `plugins/dev-browser/skills/dev-browser/SKILL.md`.
+
+CI runs `npm run sync-skills -- --check`, so plugin copies must stay in sync with the canonical skill.
+
 ## Questions?
 
 Open an issue with your question - we're happy to help.

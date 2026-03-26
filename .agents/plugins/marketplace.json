@@ -1,0 +1,20 @@
+{
+  "name": "dev-browser-local",
+  "interface": {
+    "displayName": "Dev Browser Local"
+  },
+  "plugins": [
+    {
+      "name": "dev-browser",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dev-browser"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

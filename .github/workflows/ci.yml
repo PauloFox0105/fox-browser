@@ -43,6 +43,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm run sync-skills -- --check
       - run: cd daemon && pnpm install
       - run: cd daemon && pnpm run format:check
       - uses: dtolnay/rust-toolchain@stable
