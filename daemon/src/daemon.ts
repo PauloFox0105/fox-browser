@@ -135,6 +135,7 @@ async function handleExecute(socket: net.Socket, request: ExecuteRequest): Promi
     } else {
       await manager.ensureBrowser(request.browser, {
         headless: request.headless,
+        ignoreHTTPSErrors: request.ignoreHTTPSErrors,
       });
     }
 

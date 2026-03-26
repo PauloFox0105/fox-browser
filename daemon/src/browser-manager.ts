@@ -12,6 +12,7 @@ export interface BrowserEntry {
   profileDir?: string;
   endpoint?: string;
   headless: boolean;
+  ignoreHTTPSErrors: boolean;
 }
 
 interface BrowserSummary {
@@ -90,17 +91,21 @@ export class BrowserManager {
     name: string,
     options: {
       headless?: boolean;
+      ignoreHTTPSErrors?: boolean;
     } = {}
   ): Promise<BrowserEntry> {
     await this.ensureBaseDir();
     const requestedHeadless = options.headless ?? false;
+    const requestedIgnoreHTTPSErrors = options.ignoreHTTPSErrors ?? false;
 
     const existing = this.browsers.get(name);
     if (existing) {
       const needsRelaunch =
         existing.type !== "launched" ||
         !existing.browser.isConnected() ||
-        (options.headless !== undefined && existing.headless !== requestedHeadless);
+        (options.headless !== undefined && existing.headless !== requestedHeadless) ||
+        (options.ignoreHTTPSErrors !== undefined &&
+          existing.ignoreHTTPSErrors !== requestedIgnoreHTTPSErrors);
 
       if (!needsRelaunch) {
         return existing;
@@ -109,7 +114,7 @@ export class BrowserManager {
       await this.stopBrowser(name);
     }
 
-    return this.launchBrowser(name, requestedHeadless);
+    return this.launchBrowser(name, requestedHeadless, requestedIgnoreHTTPSErrors);
   }
 
   async autoConnect(name: string): Promise<BrowserEntry> {
@@ -340,12 +345,17 @@ export class BrowserManager {
     return entry;
   }
 
-  private async launchBrowser(name: string, headless: boolean): Promise<BrowserEntry> {
+  private async launchBrowser(
+    name: string,
+    headless: boolean,
+    ignoreHTTPSErrors: boolean
+  ): Promise<BrowserEntry> {
     const profileDir = path.join(this.baseDir, name, "chromium-profile");
     await this.dependencies.mkdir(profileDir, { recursive: true });
 
     const context = await this.dependencies.launchPersistentContext(profileDir, {
       headless,
+      ignoreHTTPSErrors,
       handleSIGINT: false,
       handleSIGTERM: false,
       handleSIGHUP: false,
@@ -365,6 +375,7 @@ export class BrowserManager {
       pages: new Map(),
       profileDir,
       headless,
+      ignoreHTTPSErrors,
     };
 
     this.attachBrowserLifecycle(entry);
@@ -392,6 +403,7 @@ export class BrowserManager {
       pages: new Map(),
       endpoint,
       headless: false,
+      ignoreHTTPSErrors: false,
     };
 
     this.attachBrowserLifecycle(entry);

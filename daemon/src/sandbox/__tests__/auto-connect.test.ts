@@ -61,9 +61,18 @@ class MockContext {
   readonly pagesList: MockPage[];
   newPageCalls = 0;
   closeCalls = 0;
+  private browserHandle: MockBrowser | null = null;
 
   constructor(pages: MockPage[] = []) {
     this.pagesList = pages;
+  }
+
+  setBrowser(browser: MockBrowser): void {
+    this.browserHandle = browser;
+  }
+
+  browser(): MockBrowser | null {
+    return this.browserHandle;
   }
 
   pages(): MockPage[] {
@@ -145,6 +154,7 @@ function createManager(
     connectOverCDP?: ReturnType<typeof vi.fn>;
     fetch?: typeof globalThis.fetch;
     homedir?: () => string;
+    launchPersistentContext?: ReturnType<typeof vi.fn>;
     platform?: NodeJS.Platform;
     readFile?: ReturnType<typeof vi.fn>;
   } = {}
@@ -160,12 +170,13 @@ function createManager(
     (vi.fn(async (filePath: string) => {
       throw createEnoentError(filePath);
     }) as ReturnType<typeof vi.fn>);
+  const launchPersistentContext = options.launchPersistentContext ?? (vi.fn() as ReturnType<typeof vi.fn>);
 
   const manager = new BrowserManager(path.join("/tmp", "dev-browser-auto-connect-tests"), {
     connectOverCDP: connectOverCDP as never,
     fetch,
     homedir: options.homedir ?? (() => "/Users/tester"),
-    launchPersistentContext: vi.fn() as never,
+    launchPersistentContext: launchPersistentContext as never,
     mkdir: vi.fn(async () => undefined) as never,
     platform: options.platform ?? "darwin",
     readFile: readFile as never,
@@ -175,6 +186,7 @@ function createManager(
     manager,
     connectOverCDP,
     fetch,
+    launchPersistentContext,
     readFile,
   };
 }
@@ -188,6 +200,51 @@ afterEach(() => {
 });
 
 describe("BrowserManager auto-connect", () => {
+  it("passes ignoreHTTPSErrors to launched browsers and only relaunches when it changes", async () => {
+    const launchPersistentContext = vi.fn(async () => {
+      const context = new MockContext();
+      const browser = new MockBrowser([context]);
+      context.setBrowser(browser);
+      return context;
+    });
+    const { manager } = createManager({
+      launchPersistentContext,
+    });
+
+    const firstEntry = await manager.ensureBrowser("launched", {
+      ignoreHTTPSErrors: true,
+    });
+    const reusedEntry = await manager.ensureBrowser("launched");
+
+    expect(launchPersistentContext).toHaveBeenCalledTimes(1);
+    expect(launchPersistentContext).toHaveBeenNthCalledWith(
+      1,
+      "/tmp/dev-browser-auto-connect-tests/launched/chromium-profile",
+      expect.objectContaining({
+        headless: false,
+        ignoreHTTPSErrors: true,
+      })
+    );
+    expect(firstEntry.ignoreHTTPSErrors).toBe(true);
+    expect(reusedEntry).toBe(firstEntry);
+
+    const relaunchedEntry = await manager.ensureBrowser("launched", {
+      ignoreHTTPSErrors: false,
+    });
+
+    expect(launchPersistentContext).toHaveBeenCalledTimes(2);
+    expect(launchPersistentContext).toHaveBeenNthCalledWith(
+      2,
+      "/tmp/dev-browser-auto-connect-tests/launched/chromium-profile",
+      expect.objectContaining({
+        headless: false,
+        ignoreHTTPSErrors: false,
+      })
+    );
+    expect(relaunchedEntry).not.toBe(firstEntry);
+    expect(relaunchedEntry.ignoreHTTPSErrors).toBe(false);
+  });
+
   it("parses DevToolsActivePort and returns the browser websocket endpoint", async () => {
     const homeDir = "/Users/tester";
     const devToolsPath = path.join(
@@ -737,6 +794,29 @@ describe("protocol execute request", () => {
         browser: "default",
         script: 'console.log("hi")',
         timeoutMs: 10_000,
+      },
+    });
+  });
+
+  it("accepts ignoreHTTPSErrors for execute requests", () => {
+    const result = parseRequest(
+      JSON.stringify({
+        id: "req-ignore-https",
+        type: "execute",
+        browser: "default",
+        script: 'console.log("hi")',
+        ignoreHTTPSErrors: true,
+      })
+    );
+
+    expect(result).toEqual({
+      success: true,
+      request: {
+        id: "req-ignore-https",
+        type: "execute",
+        browser: "default",
+        script: 'console.log("hi")',
+        ignoreHTTPSErrors: true,
       },
     });
   });

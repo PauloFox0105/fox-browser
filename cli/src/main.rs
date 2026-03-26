@@ -130,6 +130,13 @@ struct Cli {
 
     #[arg(
         long,
+        help = "Ignore HTTPS certificate errors for daemon-managed Chromium",
+        long_help = "Launch or relaunch daemon-managed Chromium with HTTPS certificate errors ignored.\n\nThis is useful for self-signed certificates in local or staging environments. The setting applies per managed browser session until the daemon restarts or the setting changes and triggers a relaunch.\n\nThis only affects daemon-launched browsers. It has no effect when `--connect` attaches to an already-running external browser."
+    )]
+    ignore_https_errors: bool,
+
+    #[arg(
+        long,
         default_value_t = DEFAULT_SCRIPT_TIMEOUT_SECS,
         value_name = "SECONDS",
         value_parser = clap::value_parser!(u32).range(1..),
@@ -315,6 +322,10 @@ fn run_script(cli: &Cli, script: String) -> Result<i32, Box<dyn Error>> {
 
     if cli.headless {
         request["headless"] = Value::Bool(true);
+    }
+
+    if cli.ignore_https_errors {
+        request["ignoreHTTPSErrors"] = Value::Bool(true);
     }
 
     if let Some(endpoint) = &cli.connect {

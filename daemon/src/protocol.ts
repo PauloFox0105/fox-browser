@@ -9,6 +9,7 @@ const ExecuteRequestSchema = RequestBaseSchema.extend({
   browser: z.string().min(1).default("default"),
   script: z.string(),
   headless: z.boolean().optional(),
+  ignoreHTTPSErrors: z.boolean().optional(),
   connect: z.string().min(1).optional(),
   timeoutMs: z.number().int().positive().optional(),
 });
