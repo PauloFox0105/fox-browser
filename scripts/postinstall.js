@@ -27,6 +27,7 @@ const binDir = join(projectRoot, 'bin');
 const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'));
 const packageName = packageJson.name;
 const version = packageJson.version;
+const checksumsRequiredFromVersion = '0.2.3';
 const repoSlug = 'SawyerHood/dev-browser';
 const releasesBaseUrl = `https://github.com/${repoSlug}/releases/download`;
 const supportedTargets = Object.freeze({
@@ -114,6 +115,35 @@ function formatErrorMessage(error) {
   }
 
   return String(error);
+}
+
+function parseVersion(versionString) {
+  const [coreVersion] = versionString.split(/[-+]/, 1);
+  const parts = coreVersion.split('.');
+
+  if (parts.length !== 3 || parts.some((part) => !/^\d+$/.test(part))) {
+    throw new Error(`Invalid package version: ${versionString}`);
+  }
+
+  return parts.map((part) => Number(part));
+}
+
+function compareVersions(leftVersion, rightVersion) {
+  const leftParts = parseVersion(leftVersion);
+  const rightParts = parseVersion(rightVersion);
+
+  for (let index = 0; index < 3; index += 1) {
+    const difference = leftParts[index] - rightParts[index];
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+
+  return 0;
+}
+
+function checksumFileIsRequired() {
+  return compareVersions(version, checksumsRequiredFromVersion) >= 0;
 }
 
 function failOrWarn(message) {
@@ -390,11 +420,22 @@ async function verifyBinaryChecksum(downloadedBinaryPath, downloadedBinaryName) 
   try {
     checksumsText = await downloadText(checksumsUrl);
   } catch (error) {
-    console.warn(
-      `Warning: Could not download SHASUMS256.txt from ${checksumsUrl}: ${formatErrorMessage(error)}`,
+    if (!checksumFileIsRequired()) {
+      console.warn(
+        `Warning: Could not download SHASUMS256.txt from ${checksumsUrl}: ${formatErrorMessage(error)}`,
+      );
+      console.warn('Continuing without checksum verification for this older release.');
+      return;
+    }
+
+    rmSync(downloadedBinaryPath, { force: true });
+    throw new Error(
+      [
+        `Could not download SHASUMS256.txt from ${checksumsUrl}.`,
+        `Cause: ${formatErrorMessage(error)}`,
+        `Deleted ${downloadedBinaryName} because checksum verification is required for releases >= ${checksumsRequiredFromVersion}.`,
+      ].join('\n'),
     );
-    console.warn('Continuing without checksum verification for this release.');
-    return;
   }
 
   try {
