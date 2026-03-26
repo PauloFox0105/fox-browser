@@ -95,10 +95,11 @@ export class BrowserManager {
     } = {}
   ): Promise<BrowserEntry> {
     await this.ensureBaseDir();
-    const requestedHeadless = options.headless ?? false;
-    const requestedIgnoreHTTPSErrors = options.ignoreHTTPSErrors ?? false;
-
     const existing = this.browsers.get(name);
+    const requestedHeadless = options.headless ?? existing?.headless ?? false;
+    const requestedIgnoreHTTPSErrors =
+      options.ignoreHTTPSErrors ?? existing?.ignoreHTTPSErrors ?? false;
+
     if (existing) {
       const needsRelaunch =
         existing.type !== "launched" ||

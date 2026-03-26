@@ -170,7 +170,8 @@ function createManager(
     (vi.fn(async (filePath: string) => {
       throw createEnoentError(filePath);
     }) as ReturnType<typeof vi.fn>);
-  const launchPersistentContext = options.launchPersistentContext ?? (vi.fn() as ReturnType<typeof vi.fn>);
+  const launchPersistentContext =
+    options.launchPersistentContext ?? (vi.fn() as ReturnType<typeof vi.fn>);
 
   const manager = new BrowserManager(path.join("/tmp", "dev-browser-auto-connect-tests"), {
     connectOverCDP: connectOverCDP as never,
@@ -219,7 +220,7 @@ describe("BrowserManager auto-connect", () => {
     expect(launchPersistentContext).toHaveBeenCalledTimes(1);
     expect(launchPersistentContext).toHaveBeenNthCalledWith(
       1,
-      "/tmp/dev-browser-auto-connect-tests/launched/chromium-profile",
+      path.join("/tmp/dev-browser-auto-connect-tests", "launched", "chromium-profile"),
       expect.objectContaining({
         headless: false,
         ignoreHTTPSErrors: true,
@@ -235,7 +236,7 @@ describe("BrowserManager auto-connect", () => {
     expect(launchPersistentContext).toHaveBeenCalledTimes(2);
     expect(launchPersistentContext).toHaveBeenNthCalledWith(
       2,
-      "/tmp/dev-browser-auto-connect-tests/launched/chromium-profile",
+      path.join("/tmp/dev-browser-auto-connect-tests", "launched", "chromium-profile"),
       expect.objectContaining({
         headless: false,
         ignoreHTTPSErrors: false,
@@ -243,6 +244,38 @@ describe("BrowserManager auto-connect", () => {
     );
     expect(relaunchedEntry).not.toBe(firstEntry);
     expect(relaunchedEntry.ignoreHTTPSErrors).toBe(false);
+  });
+
+  it("preserves ignoreHTTPSErrors when relaunching for a headless change", async () => {
+    const launchPersistentContext = vi.fn(async () => {
+      const context = new MockContext();
+      const browser = new MockBrowser([context]);
+      context.setBrowser(browser);
+      return context;
+    });
+    const { manager } = createManager({
+      launchPersistentContext,
+    });
+
+    const firstEntry = await manager.ensureBrowser("launched", {
+      ignoreHTTPSErrors: true,
+    });
+    const relaunchedEntry = await manager.ensureBrowser("launched", {
+      headless: true,
+    });
+
+    expect(launchPersistentContext).toHaveBeenCalledTimes(2);
+    expect(launchPersistentContext).toHaveBeenNthCalledWith(
+      2,
+      path.join("/tmp/dev-browser-auto-connect-tests", "launched", "chromium-profile"),
+      expect.objectContaining({
+        headless: true,
+        ignoreHTTPSErrors: true,
+      })
+    );
+    expect(relaunchedEntry).not.toBe(firstEntry);
+    expect(relaunchedEntry.headless).toBe(true);
+    expect(relaunchedEntry.ignoreHTTPSErrors).toBe(true);
   });
 
   it("parses DevToolsActivePort and returns the browser websocket endpoint", async () => {
