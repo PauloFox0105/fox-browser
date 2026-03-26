@@ -28,6 +28,7 @@ function createMockEntry(page: Page): BrowserEntry {
     pages: new Map(),
     endpoint: "ws://127.0.0.1:9222/devtools/browser/test",
     headless: false,
+    ignoreHTTPSErrors: false,
   };
 }
 
