@@ -1,0 +1,25 @@
+{
+  "allowed_domains": [
+    "localhost",
+    "vercel.com",
+    "fox-pred-v3.vercel.app",
+    "financiamentos-fox.vercel.app",
+    "dashboard.stripe.com",
+    "checkout.stripe.com",
+    "github.com",
+    "centralfox.online",
+    "supabase.com",
+    "lmocfhozutjrrxuozqph.supabase.co"
+  ],
+  "blocked_domains": [
+    "gmail.com",
+    "hotmail.com",
+    "paypal.com",
+    "*.exe",
+    "*.download"
+  ],
+  "max_actions_per_session": 50,
+  "session_timeout_minutes": 30,
+  "require_https": true,
+  "allow_localhost_http": true
+}

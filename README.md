@@ -168,10 +168,31 @@ Pages are full [Playwright Page objects](https://playwright.dev/docs/api/class-p
 
 _See [dev-browser-eval](https://github.com/SawyerHood/dev-browser-eval) for methodology._
 
+## FOX Digital Fork
+
+This is a fork by [FOX Digital](https://github.com/PauloFox0105) with additional security and automation features:
+
+- **Domain whitelist** — `config/fox-domains.json` controls which domains can be navigated
+- **Audit log** — all actions logged to `~/.fox-browser/audit.log`
+- **Safety limits** — max 50 actions/session, 30-minute timeout, HTTPS required
+- **Action reporting** — actions reported before execution, destructive actions require confirmation
+
+See [FOX-ENHANCEMENTS.md](skills/fox-browser/FOX-ENHANCEMENTS.md) for the full roadmap.
+
+### FOX Installation
+
+```bash
+git clone https://github.com/PauloFox0105/fox-browser.git
+cd fox-browser
+npm install -g .
+dev-browser install
+```
+
 ## License
 
 MIT
 
 ## Author
 
-[Sawyer Hood](https://github.com/sawyerhood)
+Original: [Sawyer Hood](https://github.com/sawyerhood)
+Fork: [Paulo Fox](https://github.com/PauloFox0105)

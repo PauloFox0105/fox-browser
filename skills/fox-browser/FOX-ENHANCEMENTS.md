@@ -5,17 +5,22 @@ Fork of [SawyerHood/dev-browser](https://github.com/SawyerHood/dev-browser) with
 ## 1. Domain Whitelist
 
 Verify domains before navigation:
-- Allowed domains in `config/fox-domains.json`
-- Auto-block unauthorized domains
-- Wildcard support (`*.vercel.app`, `*.stripe.com`)
+- Allowed domains listed explicitly in `config/fox-domains.json`
+- Auto-block domains in the `blocked_domains` list
+- Prefer explicit subdomains over wildcards for security-critical domains (e.g., `dashboard.stripe.com` instead of `*.stripe.com`)
 
 ## 2. Audit Log
 
 Record all actions to `~/.fox-browser/audit.log`:
 - Timestamp (ISO 8601)
-- URL visited
+- URL visited (tokens in query params redacted)
 - Action executed (click, fill, screenshot, navigate)
-- Auto-screenshot on each navigation
+
+Security controls:
+- Password and sensitive fields (marked `data-sensitive`) are excluded from logs
+- Log file permissions: `600` (owner read/write only)
+- Automatic log rotation after 30 days
+- Screenshots skip pages with payment forms or password fields
 
 ## 3. FOX Mode
 
@@ -28,14 +33,15 @@ FOX-specific automation commands:
 
 - Max 50 actions per session
 - 30-minute session timeout
-- Mandatory confirmation before form submissions
 - No navigation to non-HTTPS URLs (except localhost)
+- Confirmation required for high-risk forms only (payment, delete actions)
+- Trusted automation scripts can disable confirmation via `--no-confirm` flag
 
 ## 5. Integration
 
 - Works with FOX ULTRA Signals API
 - Compatible with FoxShield/FoxReview testing
-- Telegram notifications on critical actions
+- Optional Telegram notifications for failed actions (configurable, disabled by default)
 
 ## Status
 
